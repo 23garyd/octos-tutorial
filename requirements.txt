@@ -2,6 +2,7 @@
 dora-rs
 pyarrow
 numpy
+pyyaml
 
 # Visual simulation (05-slam-nav-sim only)
 # mujoco
