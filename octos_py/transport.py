@@ -8,7 +8,9 @@ ActionHandle: abstract base with wait, cancel, feedback for long-running actions
 from abc import ABC, abstractmethod
 from typing import Callable, Iterator
 import json
+import socket as _socket
 import time
+import uuid
 
 
 class ActionHandle(ABC):
@@ -105,3 +107,116 @@ class DoraTransport(Transport):
     def action(self, tool_name: str, args: dict) -> ActionHandle:
         result = self.request(tool_name, args)
         return DoraActionHandle(result)
+
+
+# ---------------------------------------------------------------------------
+# ROS2 bridge transport (Unix socket + JSON, one-shot pattern)
+# ---------------------------------------------------------------------------
+
+def _send_socket_request(sock_path: str, request: dict, timeout: float = 30.0) -> dict:
+    """Send a JSON request over a Unix socket and return the JSON response."""
+    try:
+        sock = _socket.socket(_socket.AF_UNIX, _socket.SOCK_STREAM)
+        sock.settimeout(timeout)
+        sock.connect(sock_path)
+    except (FileNotFoundError, ConnectionRefusedError, OSError) as e:
+        raise ConnectionError(
+            "Cannot connect to ROS2 bridge at {}: {}".format(sock_path, e)
+        )
+    try:
+        sock.sendall(json.dumps(request).encode("utf-8"))
+        sock.shutdown(_socket.SHUT_WR)  # signal end of request
+        chunks = []
+        while True:
+            chunk = sock.recv(65536)
+            if not chunk:
+                break
+            chunks.append(chunk)
+        return json.loads(b"".join(chunks).decode("utf-8"))
+    finally:
+        sock.close()
+
+
+class Ros2ActionHandle(ActionHandle):
+    """ActionHandle backed by a ROS2 bridge action call over Unix socket."""
+
+    def __init__(self, sock_path, request_id, endpoint, args):
+        self._sock_path = sock_path
+        self._request_id = request_id
+        self._endpoint = endpoint
+        self._args = args
+        self._result = None
+
+    def wait(self, timeout: float = 30.0) -> dict:
+        if self._result is not None:
+            return self._result
+        resp = _send_socket_request(
+            self._sock_path,
+            {
+                "id": self._request_id,
+                "pattern": "action",
+                "endpoint": self._endpoint,
+                "args": self._args,
+            },
+            timeout=timeout,
+        )
+        self._result = resp
+        return resp
+
+    def cancel(self) -> None:
+        _send_socket_request(
+            self._sock_path,
+            {"id": self._request_id, "pattern": "cancel"},
+            timeout=5.0,
+        )
+
+    def feedback(self) -> Iterator[dict]:
+        return iter([])
+
+
+class Ros2Transport(Transport):
+    """Transport backed by an external ROS2 bridge process via Unix socket."""
+
+    def __init__(self, socket_path: str):
+        self._socket_path = socket_path
+
+    def request(self, tool_name: str, args: dict, timeout: float = 30.0) -> dict:
+        request_id = "req-{}".format(uuid.uuid4().hex[:8])
+        return _send_socket_request(
+            self._socket_path,
+            {
+                "id": request_id,
+                "pattern": "service",
+                "endpoint": tool_name,
+                "args": args,
+            },
+            timeout=timeout,
+        )
+
+    def publish(self, channel: str, data: dict) -> None:
+        request_id = "pub-{}".format(uuid.uuid4().hex[:8])
+        try:
+            _send_socket_request(
+                self._socket_path,
+                {
+                    "id": request_id,
+                    "pattern": "publish",
+                    "endpoint": channel,
+                    "args": data,
+                },
+                timeout=5.0,
+            )
+        except ConnectionError:
+            pass  # fire-and-forget
+
+    def subscribe(self, channel: str, callback: Callable[[dict], None]) -> None:
+        raise NotImplementedError(
+            "Ros2Transport.subscribe() requires a persistent connection. "
+            "Use the ROS2 bridge's push mechanism instead."
+        )
+
+    def action(self, tool_name: str, args: dict) -> ActionHandle:
+        request_id = "act-{}".format(uuid.uuid4().hex[:8])
+        return Ros2ActionHandle(
+            self._socket_path, request_id, tool_name, args
+        )
