@@ -1,6 +1,6 @@
 # dataflow_obstacle_avoidance.yaml — Navigation with obstacle avoidance
 #
-# 13-node dataflow: base nav (10 nodes) + obstacle avoidance (3 nodes)
+# 12-node dataflow: base nav (9 nodes) + obstacle avoidance (3 nodes)
 #   - obstacle-detector: LiDAR pointcloud → obstacle list (clustering)
 #   - costmap: LiDAR pointcloud → 2D occupancy grid with inflation
 #   - recovery-monitor: stuck detection + recovery commands
@@ -13,7 +13,7 @@
 
 nodes:
   # =======================================
-  # MuJoCo Simulation
+  # MuJoCo Simulation (with LiDAR + ground truth pose)
   # =======================================
 
   - id: mujoco-sim
@@ -23,6 +23,7 @@ nodes:
       wheel_control: nav-bridge/wheel_commands
     outputs:
       - joint_positions
+      - ground_truth_pose
       - pointcloud
     env:
       MODEL_NAME: models/hunter_se_warehouse.xml
@@ -36,17 +37,6 @@ nodes:
       LIDAR_BODY_NAME: "lidar"
       ROBOT_BODY_NAME: "hunter_base"
       POINTCLOUD_RATE: "10"
-
-  # =======================================
-  # Pose Extractor
-  # =======================================
-
-  - id: pose-extractor
-    path: nodes/pose_extractor_node.py
-    inputs:
-      joint_positions: mujoco-sim/joint_positions
-    outputs:
-      - ground_truth_pose
 
   # =======================================
   # Base Navigation Pipeline
@@ -65,7 +55,7 @@ nodes:
     path: nodes/road_lane_publisher_node.py
     inputs:
       road_lane: pub-road/road_lane
-      cur_pose: pose-extractor/ground_truth_pose
+      cur_pose: mujoco-sim/ground_truth_pose
     outputs:
       - cur_pose_all
 
@@ -84,7 +74,7 @@ nodes:
     path: nodes/obstacle_detector_node.py
     inputs:
       pointcloud: mujoco-sim/pointcloud
-      ground_truth_pose: pose-extractor/ground_truth_pose
+      ground_truth_pose: mujoco-sim/ground_truth_pose
       road_lane: pub-road/road_lane
     outputs:
       - obstacle_list
@@ -97,7 +87,7 @@ nodes:
     path: nodes/costmap_node.py
     inputs:
       pointcloud: mujoco-sim/pointcloud
-      ground_truth_pose: pose-extractor/ground_truth_pose
+      ground_truth_pose: mujoco-sim/ground_truth_pose
     outputs:
       - costmap_grid
     env:
@@ -108,7 +98,7 @@ nodes:
   - id: recovery-monitor
     path: nodes/recovery_monitor_node.py
     inputs:
-      ground_truth_pose: pose-extractor/ground_truth_pose
+      ground_truth_pose: mujoco-sim/ground_truth_pose
       Request: planning/Request
     outputs:
       - recovery_cmd
@@ -145,14 +135,15 @@ nodes:
       - SteeringCmd
 
   # =======================================
-  # Rerun 3D Visualization (obstacles + costmap)
+  # Rerun 3D Visualization (obstacles + costmap + pointcloud)
   # =======================================
 
   - id: rerun
     path: nodes/rerun_viz_node.py
     inputs:
+      pointcloud: mujoco-sim/pointcloud
       raw_path: planning/raw_path
-      cur_pose: pose-extractor/ground_truth_pose
+      cur_pose: mujoco-sim/ground_truth_pose
       obstacle_list: obstacle-detector/obstacle_list
       costmap_grid: costmap/costmap_grid
     env:
@@ -166,7 +157,7 @@ nodes:
   - id: nav-bridge
     path: nodes/nav_bridge_node.py
     inputs:
-      ground_truth_pose: pose-extractor/ground_truth_pose
+      ground_truth_pose: mujoco-sim/ground_truth_pose
       SteeringCmd: lat-control/SteeringCmd
       TrqBreCmd: lon-control/TrqBreCmd
     outputs:
