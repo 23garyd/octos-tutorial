@@ -5,12 +5,21 @@ Transport: abstract base with request, publish, subscribe, action.
 ActionHandle: abstract base with wait, cancel, feedback for long-running actions.
 """
 
+from __future__ import annotations
+
 from abc import ABC, abstractmethod
-from typing import Callable, Iterator
+from typing import Callable, Dict, Iterator, List, Optional
 import json
 import socket as _socket
 import time
 import uuid
+
+try:
+    import yaml
+except ImportError:
+    yaml = None
+
+from .tools import Tool, ToolResult, ToolRegistry
 
 
 class ActionHandle(ABC):
@@ -220,3 +229,88 @@ class Ros2Transport(Transport):
         return Ros2ActionHandle(
             self._socket_path, request_id, tool_name, args
         )
+
+
+# ---------------------------------------------------------------------------
+# TransportBridgeTool — generic Tool that delegates execute() to a Transport
+# ---------------------------------------------------------------------------
+
+class TransportBridgeTool(Tool):
+    """Generic tool that delegates execute() to a Transport."""
+
+    def __init__(
+        self,
+        tool_name: str,
+        tool_description: str,
+        transport: Transport,
+        pattern: str = "request",
+        endpoint: Optional[str] = None,
+        schema: Optional[Dict] = None,
+        safety_tier: str = "observe",
+    ):
+        self._name = tool_name
+        self._description = tool_description
+        self._transport = transport
+        self._pattern = pattern
+        self._endpoint = endpoint or tool_name
+        self._schema = schema or {"type": "object", "properties": {}}
+        self._safety_tier = safety_tier
+
+    def name(self) -> str:
+        return self._name
+
+    def description(self) -> str:
+        return self._description
+
+    def input_schema(self) -> dict:
+        return self._schema
+
+    def tags(self) -> List[str]:
+        return ["transport"]
+
+    def required_safety_tier(self) -> str:
+        return self._safety_tier
+
+    def execute(self, args: dict) -> ToolResult:
+        if self._pattern == "action":
+            handle = self._transport.action(self._endpoint, args)
+            result = handle.wait()
+        elif self._pattern == "publish":
+            self._transport.publish(self._endpoint, args)
+            result = {"status": "published"}
+        else:  # "request" or "service"
+            result = self._transport.request(self._endpoint, args)
+        return ToolResult(output=json.dumps(result, default=str))
+
+
+# ---------------------------------------------------------------------------
+# TransportRouter — reads YAML config, creates TransportBridgeTools
+# ---------------------------------------------------------------------------
+
+class TransportRouter:
+    """Reads a YAML config and creates TransportBridgeTools routed to the correct transport."""
+
+    def __init__(self, config_path: str, transports: Dict[str, Transport]):
+        if yaml is None:
+            raise ImportError("PyYAML required: pip install pyyaml")
+        with open(config_path) as f:
+            config = yaml.safe_load(f)
+        self.registry = ToolRegistry()
+        for tool_name, tool_cfg in config.get("tools", {}).items():
+            transport_key = tool_cfg["transport"]
+            if transport_key not in transports:
+                raise KeyError(
+                    "Tool '{}' references transport '{}' but available: {}".format(
+                        tool_name, transport_key, list(transports.keys())
+                    )
+                )
+            tool = TransportBridgeTool(
+                tool_name=tool_name,
+                tool_description=tool_cfg.get("description", tool_name),
+                transport=transports[transport_key],
+                pattern=tool_cfg.get("pattern", "request"),
+                endpoint=tool_cfg.get("endpoint"),
+                schema=tool_cfg.get("schema"),
+                safety_tier=tool_cfg.get("safety_tier", "observe"),
+            )
+            self.registry.register(tool)
