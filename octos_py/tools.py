@@ -77,7 +77,7 @@ class ToolRegistry:
     def set_base_tools(self, names: list[str]) -> None:
         self._base_tools = set(names)
 
-    def get(self, name: str) -> Tool | None:
+    def get(self, name: str):
         tool = self._tools.get(name)
         if tool is not None:
             self._touch(name)

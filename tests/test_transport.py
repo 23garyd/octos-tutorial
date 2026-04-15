@@ -10,9 +10,17 @@ import pytest
 
 # Import transport module directly to avoid __init__.py pulling in deps
 # that require Python 3.10+ union syntax on older interpreters.
+_base = os.path.join(os.path.dirname(__file__), "..", "octos_py")
+
+# Pre-register tools module so transport.py's relative import resolves
+_tools_spec = importlib.util.spec_from_file_location("octos_py.tools", os.path.join(_base, "tools.py"))
+_tools_mod = importlib.util.module_from_spec(_tools_spec)
+sys.modules["octos_py.tools"] = _tools_mod
+_tools_spec.loader.exec_module(_tools_mod)
+
 _spec = importlib.util.spec_from_file_location(
     "octos_py.transport",
-    os.path.join(os.path.dirname(__file__), "..", "octos_py", "transport.py"),
+    os.path.join(_base, "transport.py"),
 )
 _mod = importlib.util.module_from_spec(_spec)
 _spec.loader.exec_module(_mod)

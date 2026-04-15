@@ -19,7 +19,17 @@ try:
 except ImportError:
     yaml = None
 
-from .tools import Tool, ToolResult, ToolRegistry
+try:
+    from .tools import Tool, ToolResult, ToolRegistry
+except (ImportError, TypeError):
+    # Fallback for direct loading via importlib (avoids __init__.py on Python 3.8)
+    import importlib.util as _ilu
+    import os as _os
+    _tools_path = _os.path.join(_os.path.dirname(__file__), "tools.py")
+    _ts = _ilu.spec_from_file_location("octos_py.tools", _tools_path)
+    _tm = _ilu.module_from_spec(_ts)
+    _ts.loader.exec_module(_tm)
+    Tool, ToolResult, ToolRegistry = _tm.Tool, _tm.ToolResult, _tm.ToolRegistry
 
 
 class ActionHandle(ABC):
