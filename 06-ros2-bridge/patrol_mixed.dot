@@ -1,0 +1,12 @@
+// Mixed-transport patrol: navigate via ROS2, inspect via dora.
+digraph patrol_mixed {
+    label = "Mixed Transport Patrol"
+
+    check  [tool="get_robot_state" args="{}"]
+    map    [tool="get_map"         args="{}"]
+    nav_a  [tool="navigate_to"     args="{\"waypoint\": \"A\"}"]
+    nav_b  [tool="navigate_to"     args="{\"waypoint\": \"B\"}"]
+    home   [tool="navigate_to"     args="{\"waypoint\": \"home\"}"]
+
+    check -> map -> nav_a -> nav_b -> home
+}

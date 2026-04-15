@@ -1,0 +1,28 @@
+# 06-ros2-bridge — Mixed dora + ROS2 transport example.
+#
+# The agent routes tool calls through dora or ROS2 based on tool_transport.yaml.
+# The mock-robot node handles dora-routed tools; ROS2 tools go to the bridge process.
+#
+# Run:
+#   Terminal 1: python -m octos_py.ros2_bridge --mock --socket /tmp/octos_ros2_bridge.sock
+#   Terminal 2: cd 06-ros2-bridge && dora up && dora start dataflow.yaml --attach
+
+nodes:
+  - id: mock-robot
+    path: ../01-pipeline-basics/nodes/mock_robot_node.py
+    inputs:
+      skill_request: agent/skill_request
+    outputs:
+      - skill_result
+
+  - id: agent
+    path: nodes/agent_node.py
+    inputs:
+      skill_result: mock-robot/skill_result
+    outputs:
+      - skill_request
+    env:
+      OCTOS_PIPELINE: "patrol_mixed.dot"
+      USER_COMMAND: "Patrol stations A, B, then return home (mixed transport)"
+      TRANSPORT_CONFIG: "tool_transport.yaml"
+      ROS2_BRIDGE_SOCKET: "/tmp/octos_ros2_bridge.sock"

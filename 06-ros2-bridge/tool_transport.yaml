@@ -1,0 +1,36 @@
+# Mixed transport config — some tools via dora, others via ROS2 bridge.
+
+transports:
+  dora:
+    type: dora
+  ros2:
+    type: ros2
+    socket: /tmp/octos_ros2_bridge.sock
+
+tools:
+  navigate_to:
+    transport: ros2
+    pattern: action
+    endpoint: /navigate_to_pose
+    description: "Navigate robot to a target pose via ROS2 nav2"
+    safety_tier: safe_motion
+  get_robot_state:
+    transport: ros2
+    pattern: service
+    endpoint: /get_state
+    description: "Get current robot pose and status via ROS2"
+  get_map:
+    transport: dora
+    pattern: request
+    description: "Get station map from dora mock-robot"
+  read_lidar:
+    transport: ros2
+    pattern: service
+    endpoint: /read_lidar
+    description: "Read LiDAR scan data via ROS2"
+  stop_base:
+    transport: ros2
+    pattern: service
+    endpoint: /stop_base
+    description: "Emergency stop the robot via ROS2"
+    safety_tier: safe_motion
