@@ -1,0 +1,75 @@
+// turtlesim_patrol.dot — Square patrol with colored trail.
+// Draws a colored square on the turtlesim window:
+//   red(A→B) green(B→C) blue(C→D) white(D→home)
+
+digraph turtlesim_patrol {
+    label = "Turtlesim Square Patrol"
+
+    get_state [
+        label="check_pose"
+        tool="get_pose"
+        args='{}'
+    ]
+
+    pen_red [
+        label="set_pen_red"
+        tool="set_pen"
+        args='{"r": 255, "g": 0, "b": 0, "width": 3, "off": 0}'
+    ]
+
+    wp_a [
+        label="teleport_to_A"
+        tool="teleport_absolute"
+        args='{"x": 2.0, "y": 2.0, "theta": 0.0}'
+        checkpoint="at_A"
+    ]
+
+    pen_green [
+        label="set_pen_green"
+        tool="set_pen"
+        args='{"r": 0, "g": 255, "b": 0, "width": 3, "off": 0}'
+    ]
+
+    wp_b [
+        label="teleport_to_B"
+        tool="teleport_absolute"
+        args='{"x": 8.0, "y": 2.0, "theta": 0.0}'
+        checkpoint="at_B"
+    ]
+
+    pen_blue [
+        label="set_pen_blue"
+        tool="set_pen"
+        args='{"r": 0, "g": 0, "b": 255, "width": 3, "off": 0}'
+    ]
+
+    wp_c [
+        label="teleport_to_C"
+        tool="teleport_absolute"
+        args='{"x": 8.0, "y": 8.0, "theta": 0.0}'
+        checkpoint="at_C"
+    ]
+
+    pen_white [
+        label="set_pen_white"
+        tool="set_pen"
+        args='{"r": 255, "g": 255, "b": 255, "width": 3, "off": 0}'
+    ]
+
+    wp_d [
+        label="teleport_to_D"
+        tool="teleport_absolute"
+        args='{"x": 2.0, "y": 8.0, "theta": 0.0}'
+        checkpoint="at_D"
+    ]
+
+    home [
+        label="return_home"
+        tool="teleport_absolute"
+        args='{"x": 5.5, "y": 5.5, "theta": 0.0}'
+        checkpoint="at_home"
+    ]
+
+    get_state -> pen_red -> wp_a -> pen_green -> wp_b
+    wp_b -> pen_blue -> wp_c -> pen_white -> wp_d -> home
+}
