@@ -1,0 +1,64 @@
+# All-ROS2 transport config — no dora dependency.
+
+transports:
+  ros2:
+    type: ros2
+    socket: /tmp/octos_ros2_bridge.sock
+
+tools:
+  get_pose:
+    transport: ros2
+    pattern: service
+    endpoint: /turtle1/get_pose
+    description: "Get current pose of turtle1 (x, y, theta)"
+
+  set_pen:
+    transport: ros2
+    pattern: service
+    endpoint: /turtle1/set_pen
+    description: "Set turtle1 pen color, width, and on/off state"
+    schema:
+      type: object
+      properties:
+        r: { type: integer }
+        g: { type: integer }
+        b: { type: integer }
+        width: { type: integer }
+        off: { type: integer }
+
+  teleport_absolute:
+    transport: ros2
+    pattern: service
+    endpoint: /turtle1/teleport_absolute
+    description: "Teleport turtle1 to absolute position (x, y, theta)"
+    schema:
+      type: object
+      properties:
+        x: { type: number }
+        y: { type: number }
+        theta: { type: number }
+      required: [x, y, theta]
+
+  spawn_turtle:
+    transport: ros2
+    pattern: service
+    endpoint: /spawn
+    description: "Spawn a new turtle at (x, y, theta)"
+    schema:
+      type: object
+      properties:
+        x: { type: number }
+        y: { type: number }
+        theta: { type: number }
+        name: { type: string }
+
+  cmd_vel:
+    transport: ros2
+    pattern: publish
+    endpoint: /turtle1/cmd_vel
+    description: "Publish velocity command to turtle1 (linear_x, angular_z)"
+    schema:
+      type: object
+      properties:
+        linear_x: { type: number }
+        angular_z: { type: number }

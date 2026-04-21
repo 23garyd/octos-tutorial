@@ -11,6 +11,8 @@ Hands-on examples for building industrial robot agents with [octos](https://gith
 | 03 | [LLM Agent](03-llm-agent/) | Free-form LLM reasoning, replanning on failure | dora-rs + Ollama |
 | 04 | [Human Gate](04-human-gate/) | Operator approval gates, human-in-the-loop control | dora-rs only |
 | 05 | [SLAM Nav Sim](05-slam-nav-sim/) | Visual MuJoCo simulation, obstacle avoidance | dora-rs + MuJoCo + Rerun |
+| 06 | [ROS2 Bridge](06-ros2-bridge/) | Mixed dora + ROS2 transport routing | dora-rs + ROS2 (or mock) |
+| 07 | [Pure ROS2](07-pure-ros2/) | Zero dora dependency, real ROS2 turtlesim | ROS2 Humble + turtlesim |
 
 Examples 01-04 run in under 5 minutes with just `pip install dora-rs pyarrow numpy`.
 
