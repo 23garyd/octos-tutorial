@@ -64,6 +64,18 @@ fi
 echo ">>> cargo install dora CLI into $VENV/bin"
 cargo install --path "$SRC/binaries/cli" --locked --root "$(realpath "$VENV")"
 
+# Companion binaries for `dora record` / `dora replay`. Neither is pulled in
+# by the CLI install; both must be on PATH for record/replay to work.
+# Known rc.1 issues on macOS (as of v1.0.0-rc.1):
+#   (a) dora-record-node links @rpath/libssh2.1.dylib without LC_RPATH —
+#       export DYLD_FALLBACK_LIBRARY_PATH=/opt/homebrew/lib when invoking.
+#   (b) `dora record` writes an instrumented YAML into /tmp but resolves
+#       relative node paths against that YAML dir, breaking `path: nodes/x.py`.
+# Both issues need upstream fixes before record/replay is automation-ready.
+echo ">>> cargo install dora-record-node + dora-replay-node"
+cargo install --path "$SRC/binaries/record-node" --locked --root "$(realpath "$VENV")"
+cargo install --path "$SRC/binaries/replay-node"  --locked --root "$(realpath "$VENV")"
+
 echo ">>> maturin develop dora Python bindings"
 pushd "$SRC/apis/python/node" >/dev/null
 maturin develop --release
