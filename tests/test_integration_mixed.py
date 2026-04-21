@@ -35,17 +35,29 @@ MockRos2Handler = _bridge_mod.MockRos2Handler
 BridgeServer = _bridge_mod.BridgeServer
 
 
+def _short_sock() -> str:
+    """Unique /tmp path short enough for macOS sun_path (104 bytes)."""
+    import uuid
+    return f"/tmp/octos-{uuid.uuid4().hex[:8]}.sock"
+
+
 @pytest.fixture
-def bridge_server(tmp_path):
+def bridge_server():
     """Start a mock ROS2 bridge server."""
-    sock_path = str(tmp_path / "bridge.sock")
+    sock_path = _short_sock()
     handler = MockRos2Handler()
     server = BridgeServer(sock_path, handler)
     t = threading.Thread(target=server.serve_forever, daemon=True)
     t.start()
     time.sleep(0.3)
-    yield sock_path
-    server.shutdown()
+    try:
+        yield sock_path
+    finally:
+        server.shutdown()
+        try:
+            os.unlink(sock_path)
+        except FileNotFoundError:
+            pass
 
 
 @pytest.fixture

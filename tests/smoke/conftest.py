@@ -115,3 +115,79 @@ def assert_markers(stdout: str, markers: Iterable[str]) -> None:
         f"expected markers not found in dataflow stdout: {missing}\n"
         f"---stdout---\n{stdout[-2000:]}"
     )
+
+
+def run_dataflow_until(example_dir: str, dataflow: str, marker: str,
+                       timeout: int = 90,
+                       extra_env: dict | None = None) -> DataflowRun:
+    """Run a continuous dataflow until `marker` appears in stdout, then stop.
+
+    Use for examples (like 05) that never exit on their own. Launches with
+    Popen, polls stdout line by line, and issues `dora stop` once the marker
+    is seen. Returns whatever stdout was captured up to that point.
+    """
+    cwd = REPO_ROOT / example_dir
+    assert cwd.is_dir(), f"example directory missing: {cwd}"
+    assert (cwd / dataflow).is_file(), f"dataflow missing: {cwd / dataflow}"
+
+    env = os.environ.copy()
+    if extra_env:
+        env.update(extra_env)
+
+    try:
+        _dora("stop", cwd=cwd, timeout=10)
+    except Exception:
+        pass
+
+    proc = subprocess.Popen(
+        ["dora", "start", dataflow, "--attach"],
+        cwd=str(cwd),
+        env=env,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        text=True,
+        bufsize=1,
+    )
+    collected = []
+    deadline = time.monotonic() + timeout
+    found = False
+    try:
+        while time.monotonic() < deadline:
+            line = proc.stdout.readline()
+            if not line:
+                if proc.poll() is not None:
+                    break
+                continue
+            collected.append(line)
+            if marker in line:
+                found = True
+                break
+    finally:
+        try:
+            _dora("stop", cwd=cwd, timeout=15)
+        except Exception:
+            pass
+        try:
+            proc.wait(timeout=15)
+        except subprocess.TimeoutExpired:
+            proc.kill()
+            proc.wait()
+        try:
+            rest = proc.stdout.read()
+            if rest:
+                collected.append(rest)
+        except Exception:
+            pass
+        stderr = ""
+        try:
+            stderr = proc.stderr.read() or ""
+        except Exception:
+            pass
+
+    stdout = "".join(collected)
+    assert found, (
+        f"marker {marker!r} not seen within {timeout}s\n"
+        f"---stdout tail---\n{stdout[-2000:]}\n"
+        f"---stderr tail---\n{stderr[-1000:]}"
+    )
+    return DataflowRun(proc.returncode or 0, stdout, stderr)

@@ -6,10 +6,17 @@ import importlib
 import json
 import socket
 import threading
+import uuid
+from pathlib import Path
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
 import pytest
+
+
+def _short_sock() -> str:
+    """Unique /tmp path short enough for macOS sun_path (104 bytes)."""
+    return f"/tmp/octos-{uuid.uuid4().hex[:8]}.sock"
 
 # Import transport module directly to avoid __init__.py pulling in deps
 # that require Python 3.10+ union syntax on older interpreters.
@@ -43,9 +50,18 @@ def _start_mock_server(sock_path, responses):
             except (socket.timeout, OSError):
                 break
             try:
-                data = conn.recv(65536)
+                # Read until the client shuts down write-side (matches the
+                # real BridgeServer protocol). Without this loop the server
+                # can race the client's shutdown(SHUT_WR) and close the
+                # socket before the client finishes, producing ENOTCONN.
+                chunks = []
+                while True:
+                    chunk = conn.recv(65536)
+                    if not chunk:
+                        break
+                    chunks.append(chunk)
+                data = b"".join(chunks)
                 if not data:
-                    conn.close()
                     continue
                 req = json.loads(data.decode())
                 req_id = req.get("id", "")
@@ -54,6 +70,7 @@ def _start_mock_server(sock_path, responses):
                 else:
                     resp = {"id": req_id, "status": "success", "result": req}
                 conn.sendall(json.dumps(resp).encode())
+                conn.shutdown(socket.SHUT_WR)
             finally:
                 conn.close()
 
@@ -63,12 +80,18 @@ def _start_mock_server(sock_path, responses):
 
 
 @pytest.fixture
-def mock_server(tmp_path):
-    sock_path = str(tmp_path / "test.sock")
+def mock_server():
+    sock_path = _short_sock()
     responses = {}  # empty = echo back
     server = _start_mock_server(sock_path, responses)
-    yield sock_path
-    server.close()
+    try:
+        yield sock_path
+    finally:
+        server.close()
+        try:
+            Path(sock_path).unlink()
+        except FileNotFoundError:
+            pass
 
 
 def test_ros2_transport_request(mock_server):
