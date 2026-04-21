@@ -42,3 +42,5 @@ command -v ollama &>/dev/null && echo "  ollama: ok" || echo "  ollama: not inst
 echo ""
 echo "=== Setup complete ==="
 echo "Run: cd 01-pipeline-basics && dora up && dora start dataflow.yaml --attach"
+echo ""
+echo "For dora v1.0.0-rc.1 (built from source): ./scripts/install_dora_v1.sh"

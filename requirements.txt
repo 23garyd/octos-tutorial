@@ -1,4 +1,9 @@
 # Core (all examples)
+#
+# Default install pulls dora-rs from PyPI (latest stable: 0.5.0).
+# For dora v1.0.0-rc.1 (git tag, not yet on PyPI), see:
+#   scripts/install_dora_v1.sh
+# which builds the CLI + Python bindings from source into .venv-dora-v1.
 dora-rs
 pyarrow
 numpy

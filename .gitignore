@@ -9,3 +9,7 @@ CLAUDE.md
 05-slam-nav-sim/dora-mujoco
 05-slam-nav-sim/models/hunter_se
 05-slam-nav-sim/models/GEN72
+
+# dora v1.0.0-rc.1 build artifacts (scripts/install_dora_v1.sh)
+.dora-src/
+.venv-dora-v1/
